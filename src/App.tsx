@@ -23,11 +23,11 @@ const pcs: PC[] = [
     name: "TechX Start",
     category: "PC DE ENTRADA",
     description: "Ideal para estudos, trabalho e uso diário.",
-    processor: "Ryzen 5 4600G",
-    gpu: "Radeon Vega 7",
-    ram: "16GB DDR4",
-    storage: "SSD 480GB",
-    price: "R$ 1.899,90",
+    processor: "Intel I5 3470",
+    gpu: "HD 4000",
+    ram: "8GB DDR3",
+    storage: "SSD 120GB",
+    price: "R$ 799,90",
     image: `${BASE_URL}pcs/techx-start.png`,
   },
   {
@@ -35,11 +35,11 @@ const pcs: PC[] = [
     name: "TechX Gamer",
     category: "PC GAMER",
     description: "Performance e custo-benefício para seus jogos.",
-    processor: "Ryzen 5 5500",
-    gpu: "RX 6600 8GB",
+    processor: "Ryzen 5 2600",
+    gpu: "RTX 3050 6GB",
     ram: "16GB DDR4",
-    storage: "SSD 500GB",
-    price: "R$ 3.299,90",
+    storage: "SSD 480GB",
+    price: "R$ 2.199,90",
     image: `${BASE_URL}pcs/techx-gamer.png`,
     featured: true,
   },
@@ -69,7 +69,7 @@ const pcs: PC[] = [
   },
 ];
 
-const WHATSAPP_NUMBER = "5581XXXXXXXXX";
+const WHATSAPP_NUMBER = "5581992282511";
 
 function App() {
   const [selectedPC, setSelectedPC] = useState<PC | null>(null);
