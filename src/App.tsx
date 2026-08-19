@@ -1,6 +1,8 @@
 import { useState } from "react";
 import "./App.css";
 
+const BASE_URL = import.meta.env.BASE_URL;
+
 type PC = {
   id: string;
   name: string;
@@ -26,7 +28,7 @@ const pcs: PC[] = [
     ram: "16GB DDR4",
     storage: "SSD 480GB",
     price: "R$ 1.899,90",
-    image: "/pcs/techx-start.png",
+    image: `${BASE_URL}pcs/techx-start.png`,
   },
   {
     id: "techx-gamer",
@@ -38,7 +40,7 @@ const pcs: PC[] = [
     ram: "16GB DDR4",
     storage: "SSD 500GB",
     price: "R$ 3.299,90",
-    image: "/pcs/techx-gamer.png",
+    image: `${BASE_URL}pcs/techx-gamer.png`,
     featured: true,
   },
   {
@@ -51,7 +53,7 @@ const pcs: PC[] = [
     ram: "16GB DDR4",
     storage: "SSD NVMe 1TB",
     price: "R$ 4.199,90",
-    image: "/pcs/techx-pro.png",
+    image: `${BASE_URL}pcs/techx-pro.png`,
   },
   {
     id: "techx-extreme",
@@ -63,7 +65,7 @@ const pcs: PC[] = [
     ram: "32GB DDR5",
     storage: "SSD NVMe 1TB",
     price: "R$ 7.499,90",
-    image: "/pcs/techx-extreme.png",
+    image: `${BASE_URL}pcs/techx-extreme.png`,
   },
 ];
 
@@ -103,7 +105,7 @@ function App() {
             }}
           >
             <img
-              src="/brand/logo-transparent.png"
+              src={`${BASE_URL}brand/logo-transparent.png`}
               alt="Central TechX"
               className="brand-logo"
             />
@@ -242,7 +244,7 @@ function App() {
       <header className="navbar">
         <a href="#inicio" className="logo">
           <img
-            src="/brand/logo-transparent.png.png"
+            src={`${BASE_URL}brand/logo-transparent.png.png`}
             alt="Central TechX"
             className="brand-logo"
           />
@@ -345,7 +347,7 @@ function App() {
             <div className="hero-image-glow"></div>
 
             <img
-              src="/hero/central-pc.png"
+              src={`${BASE_URL}hero/central-pc.png`}
               alt="PC Gamer Central TechX"
               className="hero-pc-image"
             />
@@ -461,7 +463,7 @@ function App() {
         <footer id="contato" className="footer">
           <div className="footer-logo">
             <img
-              src="/brand/logo-transparent.png.png"
+              src={`${BASE_URL}brand/logo-transparent.png.png`}
               alt="Central TechX"
               className="footer-brand-logo"
             />
