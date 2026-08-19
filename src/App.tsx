@@ -77,7 +77,7 @@ function App() {
   function contactWhatsApp(pc?: PC) {
     const message = pc
       ? `Olá! Tenho interesse no ${pc.name} da Central TechX. Gostaria de saber mais sobre disponibilidade e pagamento.`
-      : "Olá! Gostaria de conhecer os PCs da Central TechX.";
+      : "Olá! Gostaria de montar minha própia configuração ou contratar algum serviço.";
 
     const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(
       message,
@@ -448,7 +448,7 @@ function App() {
             </h2>
 
             <small>
-              Escolha as peças e nós montamos para você.
+              Escolha as peças e nós montamos para você ou contrate nossos serviços.
             </small>
           </div>
 
