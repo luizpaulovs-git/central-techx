@@ -309,6 +309,20 @@ function App() {
               jogar, trabalhar e estudar sem limites.
             </p>
 
+            <div className="hero-stock-status">
+              {pcs.filter((pc) => pc.stock).length > 0 ? (
+                <>
+                  <span className="hero-stock-dot">●</span>
+                  <strong>PCs disponíveis em estoque</strong>
+                </>
+              ) : (
+                <>
+                  <span className="hero-stock-dot">●</span>
+                  <strong>Sem PCs disponíveis no momento</strong>
+                </>
+              )}
+            </div>
+
             <div className="hero-buttons">
               <a href="#pcs" className="primary-button">
                 🖥️ &nbsp; VER PCs
@@ -400,6 +414,10 @@ function App() {
                   <p className="card-category">{pc.category}</p>
 
                   <h3>{pc.name}</h3>
+
+                    <div className={pc.stock ? "stock-ok" : "stock-off"}>
+                      {pc.stock ? "🟢 Em estoque" : "🔴 Sem estoque"}
+                    </div>
 
                   <p className="card-description">
                     {pc.description}
