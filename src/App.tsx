@@ -14,6 +14,7 @@ type PC = {
   storage: string;
   price: string;
   image: string;
+  stock: boolean;
   featured?: boolean;
 };
 
@@ -24,23 +25,25 @@ const pcs: PC[] = [
     category: "PC DE ENTRADA",
     description: "Ideal para estudos, trabalho e uso diário.",
     processor: "Intel I5 3470",
-    gpu: "HD 4000",
+    gpu: "Intel HD Graphics 2500",
     ram: "8GB DDR3",
     storage: "SSD 120GB",
     price: "R$ 799,90",
     image: `${BASE_URL}pcs/techx-start.png`,
+    stock: true,
   },
   {
     id: "techx-gamer",
-    name: "TechX Gamer",
-    category: "PC GAMER",
+    name: "TechX Médio",
+    category: "PC intermediário",
     description: "Performance e custo-benefício para seus jogos.",
     processor: "Ryzen 5 2600",
-    gpu: "RTX 3050 6GB",
+    gpu: "RX 550 4GB",
     ram: "16GB DDR4",
     storage: "SSD 480GB",
-    price: "R$ 2.199,90",
+    price: "R$ 1,999,90",
     image: `${BASE_URL}pcs/techx-gamer.png`,
+    stock: true,
     featured: true,
   },
   {
@@ -49,11 +52,12 @@ const pcs: PC[] = [
     category: "PC GAMER",
     description: "Alto desempenho para jogos e criação de conteúdo.",
     processor: "Ryzen 5 5600",
-    gpu: "RTX 4060 8GB",
+    gpu: "RTX 3050 6GB",
     ram: "16GB DDR4",
-    storage: "SSD NVMe 1TB",
-    price: "R$ 4.199,90",
+    storage: "SSD NVMe 256GB",
+    price: "R$ 3.199,90",
     image: `${BASE_URL}pcs/techx-pro.png`,
+    stock: true,
   },
   {
     id: "techx-extreme",
@@ -61,11 +65,12 @@ const pcs: PC[] = [
     category: "ALTO DESEMPENHO",
     description: "Para quem exige o máximo de desempenho.",
     processor: "Ryzen 7 7700",
-    gpu: "RTX 4070 12GB",
+    gpu: "RTX 4060 8GB",
     ram: "32GB DDR5",
-    storage: "SSD NVMe 1TB",
-    price: "R$ 7.499,90",
+    storage: "SSD NVMe 512GB",
+    price: "R$ 5.499,90",
     image: `${BASE_URL}pcs/techx-extreme.png`,
+    stock: true,
   },
 ];
 
@@ -176,6 +181,10 @@ function App() {
               </p>
 
               <h1>{selectedPC.name}</h1>
+
+              <div className={selectedPC.stock ? "stock-ok" : "stock-off"}>
+                {selectedPC.stock ? "🟢 Em estoque" : "🔴 Sem estoque"}
+              </div>
 
               <p className="detail-description">
                 {selectedPC.description}
