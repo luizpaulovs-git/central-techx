@@ -105,7 +105,7 @@ function App() {
             }}
           >
             <img
-              src={`${BASE_URL}brand/logo-transparent.png`}
+              src={`${BASE_URL}brand/logo-transparent.png.png`}
               alt="Central TechX"
               className="brand-logo"
             />
