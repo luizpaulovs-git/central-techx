@@ -30,7 +30,7 @@ const pcs: PC[] = [
     storage: "SSD 120GB",
     price: "R$ 799,90",
     image: `${BASE_URL}pcs/techx-start.png`,
-    stock: true,
+    stock: false,
   },
   {
     id: "techx-gamer",
@@ -43,8 +43,8 @@ const pcs: PC[] = [
     storage: "SSD 480GB",
     price: "R$ 1,999,90",
     image: `${BASE_URL}pcs/techx-gamer.png`,
-    stock: true,
-    featured: true,
+    stock: false,
+    featured: false,
   },
   {
     id: "techx-pro",
@@ -57,7 +57,7 @@ const pcs: PC[] = [
     storage: "SSD NVMe 256GB",
     price: "R$ 3.199,90",
     image: `${BASE_URL}pcs/techx-pro.png`,
-    stock: true,
+    stock: false,
   },
   {
     id: "techx-extreme",
@@ -70,7 +70,7 @@ const pcs: PC[] = [
     storage: "SSD NVMe 512GB",
     price: "R$ 5.499,90",
     image: `${BASE_URL}pcs/techx-extreme.png`,
-    stock: true,
+    stock: false,
   },
 ];
 
