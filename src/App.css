@@ -2761,3 +2761,18 @@ a {
     height: 250px;
   }
 }
+.stock-ok,
+.stock-off {
+  font-size: 12px;
+  font-weight: 500;
+  margin: 8px 0;
+  letter-spacing: 0;
+}
+
+.stock-ok {
+  color: #22c55e;
+}
+
+.stock-off {
+  color: #ef4444;
+}
