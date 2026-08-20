@@ -35,7 +35,7 @@ const pcs: PC[] = [
   {
     id: "techx-gamer",
     name: "TechX Médio",
-    category: "PC intermediário",
+    category: "PC INTERMEDIÁRIO",
     description: "Performance e custo-benefício para seus jogos.",
     processor: "Ryzen 5 2600",
     gpu: "RX 550 4GB",
