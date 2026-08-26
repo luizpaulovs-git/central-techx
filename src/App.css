@@ -3248,3 +3248,135 @@ a {
     font-size: 15px;
   }
 }
+/* =========================================
+   HERO — AJUSTE FINAL DO PC
+========================================= */
+
+.hero-pc {
+  width: 55%;
+  height: 520px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  overflow: visible;
+}
+
+.hero-pc-image {
+  width: min(620px, 48vw);
+  max-width: 620px;
+  height: auto;
+
+  object-fit: contain;
+
+  transform: translateX(10px);
+
+  animation: techxHeroFloat 5s ease-in-out infinite;
+
+  filter:
+    drop-shadow(0 25px 35px rgba(0, 0, 0, 0.55))
+    drop-shadow(0 0 30px rgba(0, 102, 255, 0.25));
+
+  transition:
+    transform 0.45s ease,
+    filter 0.45s ease;
+}
+
+.hero-pc:hover .hero-pc-image {
+  transform: translateX(10px) scale(1.025);
+
+  filter:
+    drop-shadow(0 30px 45px rgba(0, 0, 0, 0.6))
+    drop-shadow(0 0 45px rgba(0, 102, 255, 0.42));
+}
+
+
+/* =========================================
+   HERO — TABLET
+========================================= */
+
+@media (max-width: 900px) {
+
+  .hero-pc {
+    width: 100%;
+    height: 330px;
+
+    margin-top: 0;
+  }
+
+  .hero-pc-image {
+    width: min(480px, 90vw);
+    max-width: 480px;
+
+    transform: none;
+  }
+
+  .hero-pc:hover .hero-pc-image {
+    transform: scale(1.02);
+  }
+}
+
+
+/* =========================================
+   HERO — CELULAR
+========================================= */
+
+@media (max-width: 700px) {
+
+  .hero-pc {
+    width: 100%;
+    height: 250px;
+
+    margin-top: -5px;
+  }
+
+  .hero-pc-image {
+    width: 320px;
+    max-width: 82vw;
+
+    transform: none;
+  }
+
+  .hero-pc:hover .hero-pc-image {
+    transform: scale(1.02);
+  }
+
+  .hero-image-glow {
+    width: 220px;
+    height: 220px;
+
+    right: 50%;
+    top: 50%;
+
+    transform: translate(50%, -50%);
+  }
+
+  @keyframes techxHeroFloat {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+
+    50% {
+      transform: translateY(-5px);
+    }
+  }
+}
+
+
+/* =========================================
+   HERO — CELULAR PEQUENO
+========================================= */
+
+@media (max-width: 380px) {
+
+  .hero-pc {
+    height: 225px;
+  }
+
+  .hero-pc-image {
+    width: 285px;
+    max-width: 82vw;
+  }
+}
