@@ -61,6 +61,16 @@ a {
   gap: 12px;
 }
 
+.logo {
+  flex-shrink: 0;
+}
+
+.brand-logo {
+  width: 150px;
+  height: auto;
+  object-fit: contain;
+}
+
 .logo-symbol {
   position: relative;
   width: 48px;
