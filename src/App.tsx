@@ -1,7 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "./App.css";
+import {
+  supabase,
+  type Order,
+  type OrderStatus,
+  type PaymentStatus,
+} from "./lib/supabase";
 
 const BASE_URL = import.meta.env.BASE_URL;
+const WHATSAPP_NUMBER = "5581992282511";
+const ORDER_STORAGE_KEY = "central-techx-order-codes";
 
 type PC = {
   id: string;
@@ -13,6 +21,7 @@ type PC = {
   ram: string;
   storage: string;
   price: string;
+  priceValue: number;
   image: string;
   stock: boolean;
   featured?: boolean;
@@ -29,6 +38,7 @@ const pcs: PC[] = [
     ram: "8GB DDR3",
     storage: "SSD 120GB",
     price: "R$ 799,90",
+    priceValue: 799.9,
     image: `${BASE_URL}pcs/techx-start.png`,
     stock: false,
   },
@@ -41,10 +51,10 @@ const pcs: PC[] = [
     gpu: "RX 550 4GB",
     ram: "16GB DDR4",
     storage: "SSD 480GB",
-    price: "R$ 1,999,90",
+    price: "R$ 1.999,90",
+    priceValue: 1999.9,
     image: `${BASE_URL}pcs/techx-gamer.png`,
     stock: false,
-    featured: false,
   },
   {
     id: "techx-pro",
@@ -56,6 +66,7 @@ const pcs: PC[] = [
     ram: "16GB DDR4",
     storage: "SSD NVMe 256GB",
     price: "R$ 3.199,90",
+    priceValue: 3199.9,
     image: `${BASE_URL}pcs/techx-pro.png`,
     stock: false,
   },
@@ -69,79 +80,249 @@ const pcs: PC[] = [
     ram: "32GB DDR5",
     storage: "SSD NVMe 512GB",
     price: "R$ 5.499,90",
+    priceValue: 5499.9,
     image: `${BASE_URL}pcs/techx-extreme.png`,
     stock: false,
   },
 ];
 
-const WHATSAPP_NUMBER = "5581992282511";
+const statusInfo: Record<
+  OrderStatus,
+  { label: string; icon: string; className: string }
+> = {
+  recebido: {
+    label: "Pedido recebido",
+    icon: "📦",
+    className: "status-recebido",
+  },
+
+  preparo: {
+    label: "Pedido em preparo",
+    icon: "🛠️",
+    className: "status-preparo",
+  },
+
+  caminho: {
+    label: "A caminho",
+    icon: "🚚",
+    className: "status-caminho",
+  },
+
+  entregue: {
+    label: "Entregue",
+    icon: "✅",
+    className: "status-entregue",
+  },
+};
+
+function readSavedCodes() {
+  try {
+    return JSON.parse(
+      localStorage.getItem(ORDER_STORAGE_KEY) || "[]",
+    ) as string[];
+  } catch {
+    return [];
+  }
+}
+
+function saveOrderCode(code: string) {
+  const codes = Array.from(new Set([code, ...readSavedCodes()]));
+
+  localStorage.setItem(
+    ORDER_STORAGE_KEY,
+    JSON.stringify(codes.slice(0, 20)),
+  );
+}
+
+function money(value: number) {
+  return value.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
+}
 
 function App() {
+  const [page, setPage] = useState<"home" | "orders" | "admin">("home");
   const [selectedPC, setSelectedPC] = useState<PC | null>(null);
+  const [orderPC, setOrderPC] = useState<PC | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
+  const [adminUser, setAdminUser] = useState(false);
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [adminError, setAdminError] = useState("");
 
-  function contactWhatsApp(pc?: PC) {
-    const message = pc
-      ? `Olá! Tenho interesse no ${pc.name} da Central TechX. Gostaria de saber mais sobre disponibilidade e pagamento.`
-      : "Olá! Gostaria de montar minha própia configuração ou contratar algum serviço.";
+  async function ensureCustomerSession() {
+    const { data } = await supabase.auth.getSession();
 
-    const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(
-      message,
-    )}`;
+    if (data.session) {
+      return data.session;
+    }
 
-    window.open(url, "_blank");
+    const { data: anonymousData, error } =
+      await supabase.auth.signInAnonymously();
+
+    if (error) {
+      console.error("Erro ao criar sessão anônima:", error);
+
+      setMessage(
+        "Não foi possível iniciar sua sessão. Verifique a configuração do Supabase.",
+      );
+
+      return null;
+    }
+
+    return anonymousData.session;
   }
 
-  /*
-   * =========================
-   * PÁGINA DE DETALHES
-   * =========================
-   */
+  async function loadOrders() {
+    setLoadingOrders(true);
+
+    const session = await ensureCustomerSession();
+
+    if (!session?.user) {
+      setOrders([]);
+      setLoadingOrders(false);
+      return;
+    }
+
+    const userId = session.user.id;
+
+    const { data, error } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("customer_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Erro ao carregar pedidos:", error);
+      setMessage("Não foi possível carregar os pedidos.");
+    } else {
+      setOrders((data || []) as Order[]);
+    }
+
+    setLoadingOrders(false);
+  }
+
+  async function checkAdmin() {
+    const { data } = await supabase.auth.getSession();
+
+    if (!data.session?.user) {
+      setAdminUser(false);
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", data.session.user.id)
+      .maybeSingle();
+
+    setAdminUser(profile?.role === "admin");
+  }
+
+  useEffect(() => {
+    void checkAdmin();
+  }, []);
+
+  useEffect(() => {
+    if (page === "orders") {
+      void loadOrders();
+    }
+  }, [page]);
+
+  function goHome() {
+    setPage("home");
+    setSelectedPC(null);
+    setOrderPC(null);
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  }
+
+  function contactWhatsApp(pc?: PC) {
+    const messageText = pc
+      ? `Olá! Tenho interesse no ${pc.name} da Central TechX. Gostaria de saber mais sobre disponibilidade.`
+      : "Olá! Gostaria de montar minha própria configuração ou contratar algum serviço.";
+
+    window.open(
+      `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(
+        messageText,
+      )}`,
+      "_blank",
+    );
+  }
+
+  function openOrder(pc: PC) {
+    if (!pc.stock) {
+      contactWhatsApp(pc);
+      return;
+    }
+
+    setSelectedPC(null);
+    setOrderPC(pc);
+  }
+
+  if (page === "orders") {
+    return (
+      <div className="site">
+        <Header
+          page={page}
+          onHome={goHome}
+          onOrders={() => setPage("orders")}
+        />
+
+        <OrdersPage
+          orders={orders}
+          loading={loadingOrders}
+          onHome={goHome}
+          onRefresh={loadOrders}
+          message={message}
+        />
+      </div>
+    );
+  }
+
+  if (page === "admin") {
+    return (
+      <div className="site">
+        <Header
+          page={page}
+          onHome={goHome}
+          onOrders={() => setPage("orders")}
+        />
+
+        <AdminPage
+          adminUser={adminUser}
+          adminLoading={adminLoading}
+          setAdminLoading={setAdminLoading}
+          orders={orders}
+          setOrders={setOrders}
+          onLogin={checkAdmin}
+          onLogout={async () => {
+            await supabase.auth.signOut();
+
+            setAdminUser(false);
+            setOrders([]);
+            setPage("home");
+          }}
+          error={adminError}
+          setError={setAdminError}
+        />
+      </div>
+    );
+  }
 
   if (selectedPC) {
     return (
       <div className="site">
-        <header className="navbar">
-          <a
-            href="#"
-            className="logo"
-            onClick={(event) => {
-              event.preventDefault();
-              setSelectedPC(null);
-            }}
-          >
-            <img
-              src={`${BASE_URL}brand/logo-transparent.png.png`}
-              alt="Central TechX"
-              className="brand-logo"
-            />
-          </a>
-
-          <nav className="nav-links">
-            <a
-              href="#"
-              onClick={(event) => {
-                event.preventDefault();
-                setSelectedPC(null);
-              }}
-            >
-              INÍCIO
-            </a>
-
-            <a className="active" href="#detalhes">
-              PCs
-            </a>
-
-            <a href="#sobre">SOBRE</a>
-            <a href="#contato">CONTATO</a>
-          </nav>
-
-          <button
-            className="whatsapp-button"
-            onClick={() => contactWhatsApp(selectedPC)}
-          >
-            ◉ &nbsp; FALAR NO WHATSAPP
-          </button>
-        </header>
+        <Header
+          page="pcs"
+          onHome={goHome}
+          onOrders={() => setPage("orders")}
+        />
 
         <div className="important-notice">
           <span className="notice-icon">⚠</span>
@@ -150,23 +331,23 @@ function App() {
             <strong>AVISO IMPORTANTE</strong>
 
             <p>
-              Devido a questões logísticas, no momento não realizamos
-              envio de PCs para outros estados.
+              Devido a questões logísticas, no momento não realizamos envio de
+              PCs para outros estados.
             </p>
           </div>
         </div>
 
-        <main className="product-detail" id="detalhes">
+        <main className="product-detail">
           <button
             className="back-button"
-            onClick={() => setSelectedPC(null)}
+            onClick={goHome}
           >
             ← VOLTAR PARA OS PCs
           </button>
 
           <div className="detail-layout">
             <div className="detail-image-container">
-              <div className="detail-glow"></div>
+              <div className="detail-glow" />
 
               <img
                 src={selectedPC.image}
@@ -182,8 +363,16 @@ function App() {
 
               <h1>{selectedPC.name}</h1>
 
-              <div className={selectedPC.stock ? "stock-ok" : "stock-off"}>
-                {selectedPC.stock ? "🟢 Em estoque" : "🔴 Sem estoque"}
+              <div
+                className={
+                  selectedPC.stock
+                    ? "stock-ok"
+                    : "stock-off"
+                }
+              >
+                {selectedPC.stock
+                  ? "🟢 Em estoque"
+                  : "🔴 Sem estoque"}
               </div>
 
               <p className="detail-description">
@@ -191,48 +380,55 @@ function App() {
               </p>
 
               <div className="detail-specs">
-                <div className="detail-spec">
-                  <span>PROCESSADOR</span>
-                  <strong>{selectedPC.processor}</strong>
-                </div>
+                <DetailSpec
+                  label="PROCESSADOR"
+                  value={selectedPC.processor}
+                />
 
-                <div className="detail-spec">
-                  <span>PLACA DE VÍDEO</span>
-                  <strong>{selectedPC.gpu}</strong>
-                </div>
+                <DetailSpec
+                  label="PLACA DE VÍDEO"
+                  value={selectedPC.gpu}
+                />
 
-                <div className="detail-spec">
-                  <span>MEMÓRIA RAM</span>
-                  <strong>{selectedPC.ram}</strong>
-                </div>
+                <DetailSpec
+                  label="MEMÓRIA RAM"
+                  value={selectedPC.ram}
+                />
 
-                <div className="detail-spec">
-                  <span>ARMAZENAMENTO</span>
-                  <strong>{selectedPC.storage}</strong>
-                </div>
+                <DetailSpec
+                  label="ARMAZENAMENTO"
+                  value={selectedPC.storage}
+                />
 
-                <div className="detail-spec">
-                  <span>MONTAGEM</span>
-                  <strong>Profissional</strong>
-                </div>
+                <DetailSpec
+                  label="MONTAGEM"
+                  value="Profissional"
+                />
 
-                <div className="detail-spec">
-                  <span>GARANTIA</span>
-                  <strong>Consulte condições</strong>
-                </div>
+                <DetailSpec
+                  label="GARANTIA"
+                  value="Consulte condições"
+                />
               </div>
 
               <div className="detail-buy">
                 <div>
                   <small>A PARTIR DE</small>
-                  <strong>{selectedPC.price}</strong>
+
+                  <strong>
+                    {selectedPC.price}
+                  </strong>
                 </div>
 
                 <button
                   className="whatsapp-buy"
-                  onClick={() => contactWhatsApp(selectedPC)}
+                  onClick={() =>
+                    openOrder(selectedPC)
+                  }
                 >
-                  ◉ &nbsp; TENHO INTERESSE
+                  {selectedPC.stock
+                    ? "FAZER PEDIDO →"
+                    : "◉ CONSULTAR DISPONIBILIDADE"}
                 </button>
               </div>
             </div>
@@ -242,40 +438,13 @@ function App() {
     );
   }
 
-  /*
-   * =========================
-   * HOME
-   * =========================
-   */
-
   return (
     <div className="site">
-      <header className="navbar">
-        <a href="#inicio" className="logo">
-          <img
-            src={`${BASE_URL}brand/logo-transparent.png.png`}
-            alt="Central TechX"
-            className="brand-logo"
-          />
-        </a>
-
-        <nav className="nav-links">
-          <a href="#inicio" className="active">
-            INÍCIO
-          </a>
-
-          <a href="#pcs">PCs</a>
-          <a href="#sobre">SOBRE</a>
-          <a href="#contato">CONTATO</a>
-        </nav>
-
-        <button
-          className="whatsapp-button"
-          onClick={() => contactWhatsApp()}
-        >
-          ◉ &nbsp; FALAR NO WHATSAPP
-        </button>
-      </header>
+      <Header
+        page="home"
+        onHome={goHome}
+        onOrders={() => setPage("orders")}
+      />
 
       <div className="important-notice">
         <span className="notice-icon">⚠</span>
@@ -284,16 +453,21 @@ function App() {
           <strong>AVISO IMPORTANTE</strong>
 
           <p>
-            Devido a questões logísticas, no momento não realizamos
-            envio de PCs para outros estados.
+            Devido a questões logísticas, no momento não realizamos envio de
+            PCs para outros estados.
           </p>
         </div>
       </div>
 
       <main>
-        <section className="hero" id="inicio">
+        <section
+          className="hero"
+          id="inicio"
+        >
           <div className="hero-content">
-            <p className="hero-small">CENTRAL TECH X</p>
+            <p className="hero-small">
+              CENTRAL TECH X
+            </p>
 
             <h1>
               SEU PRÓXIMO
@@ -309,53 +483,47 @@ function App() {
               jogar, trabalhar e estudar sem limites.
             </p>
 
-
-
             <div className="hero-buttons">
-              <a href="#pcs" className="primary-button">
+              <a
+                href="#pcs"
+                className="primary-button"
+              >
                 🖥️ &nbsp; VER PCs
               </a>
 
               <button
                 className="secondary-button"
-                onClick={() => contactWhatsApp()}
+                onClick={() =>
+                  contactWhatsApp()
+                }
               >
                 ◉ &nbsp; FALE CONOSCO
               </button>
             </div>
 
             <div className="hero-benefits">
-              <div className="benefit">
-                <span className="benefit-icon">♢</span>
+              <Benefit
+                icon="♢"
+                title="GARANTIA"
+                text="De verdade"
+              />
 
-                <div>
-                  <strong>GARANTIA</strong>
-                  <small>De verdade</small>
-                </div>
-              </div>
+              <Benefit
+                icon="⚙"
+                title="PEÇAS DE QUALIDADE"
+                text="Das melhores marcas"
+              />
 
-              <div className="benefit">
-                <span className="benefit-icon">⚙</span>
-
-                <div>
-                  <strong>PEÇAS DE QUALIDADE</strong>
-                  <small>Das melhores marcas</small>
-                </div>
-              </div>
-
-              <div className="benefit">
-                <span className="benefit-icon">▣</span>
-
-                <div>
-                  <strong>MONTAGEM</strong>
-                  <small>Profissional</small>
-                </div>
-              </div>
+              <Benefit
+                icon="▣"
+                title="MONTAGEM"
+                text="Profissional"
+              />
             </div>
           </div>
 
           <div className="hero-pc">
-            <div className="hero-image-glow"></div>
+            <div className="hero-image-glow" />
 
             <img
               src={`${BASE_URL}hero/central-pc.png`}
@@ -365,14 +533,19 @@ function App() {
           </div>
         </section>
 
-        <section className="products" id="pcs">
-          <p className="section-small">ESCOLHA O SEU</p>
+        <section
+          className="products"
+          id="pcs"
+        >
+          <p className="section-small">
+            ESCOLHA O SEU
+          </p>
 
           <h2>
             NOSSOS <span>PCs</span>
           </h2>
 
-          <div className="section-line"></div>
+          <div className="section-line" />
 
           <p className="section-description">
             Computadores montados para diferentes níveis de desempenho.
@@ -381,7 +554,9 @@ function App() {
           <div className="pc-grid">
             {pcs.map((pc) => (
               <article
-                className={`pc-card ${pc.featured ? "featured" : ""}`}
+                className={`pc-card ${
+                  pc.featured ? "featured" : ""
+                }`}
                 key={pc.id}
               >
                 {pc.featured && (
@@ -399,52 +574,67 @@ function App() {
                 </div>
 
                 <div className="card-content">
-                  <p className="card-category">{pc.category}</p>
+                  <p className="card-category">
+                    {pc.category}
+                  </p>
 
                   <h3>{pc.name}</h3>
 
-                    <div className={pc.stock ? "stock-ok" : "stock-off"}>
-                      {pc.stock ? "🟢 Em estoque" : "🔴 Sem estoque"}
-                    </div>
+                  <div
+                    className={
+                      pc.stock
+                        ? "stock-ok"
+                        : "stock-off"
+                    }
+                  >
+                    {pc.stock
+                      ? "🟢 Em estoque"
+                      : "🔴 Sem estoque"}
+                  </div>
 
                   <p className="card-description">
                     {pc.description}
                   </p>
 
                   <div className="specs">
-                    <div>
-                      <span>PROCESSADOR</span>
-                      <strong>{pc.processor}</strong>
-                    </div>
+                    <Spec
+                      label="PROCESSADOR"
+                      value={pc.processor}
+                    />
 
-                    <div>
-                      <span>PLACA DE VÍDEO</span>
-                      <strong>{pc.gpu}</strong>
-                    </div>
+                    <Spec
+                      label="PLACA DE VÍDEO"
+                      value={pc.gpu}
+                    />
 
-                    <div>
-                      <span>MEMÓRIA</span>
-                      <strong>{pc.ram}</strong>
-                    </div>
+                    <Spec
+                      label="MEMÓRIA"
+                      value={pc.ram}
+                    />
 
-                    <div>
-                      <span>ARMAZENAMENTO</span>
-                      <strong>{pc.storage}</strong>
-                    </div>
+                    <Spec
+                      label="ARMAZENAMENTO"
+                      value={pc.storage}
+                    />
                   </div>
 
                   <div className="card-bottom">
                     <div>
                       <small>A PARTIR DE</small>
-                      <strong>{pc.price}</strong>
+
+                      <strong>
+                        {pc.price}
+                      </strong>
                     </div>
 
                     <button
                       type="button"
                       className="details-button"
-                      onClick={() => setSelectedPC(pc)}
+                      onClick={() =>
+                        setSelectedPC(pc)
+                      }
                     >
-                      VER DETALHES
+                      VER DETALHES{" "}
                       <span>→</span>
                     </button>
                   </div>
@@ -454,7 +644,10 @@ function App() {
           </div>
         </section>
 
-        <section className="custom-build" id="sobre">
+        <section
+          className="custom-build"
+          id="sobre"
+        >
           <div>
             <p>MONTE O SEU PC</p>
 
@@ -463,19 +656,16 @@ function App() {
             </h2>
 
             <small>
-              Escolha as peças e nós montamos para você ou contrate nossos serviços.
+              Escolha as peças e nós montamos para você ou contrate nossos
+              serviços.
             </small>
           </div>
-
-          <button
-            className="custom-button"
-            onClick={() => contactWhatsApp()}
-          >
-            FALAR COM A CENTRAL TECHX →
-          </button>
         </section>
 
-        <footer id="contato" className="footer">
+        <footer
+          id="contato"
+          className="footer"
+        >
           <div className="footer-logo">
             <img
               src={`${BASE_URL}brand/logo-transparent.png.png`}
@@ -484,10 +674,1111 @@ function App() {
             />
           </div>
 
-          <p>© 2026 Central TechX. Todos os direitos reservados.</p>
+          <p>
+            © 2026 Central TechX. Todos os direitos reservados.
+          </p>
+
+          <button
+            type="button"
+            className="employee-access"
+            onClick={() => setPage("admin")}
+          >
+            É funcionário?{" "}
+            <span>
+              Acessar área de funcionários
+            </span>
+          </button>
         </footer>
       </main>
+
+      {orderPC && (
+        <OrderModal
+          pc={orderPC}
+          onClose={() => setOrderPC(null)}
+          onCreated={(code) => {
+            saveOrderCode(code);
+            setOrderPC(null);
+            setMessage(
+              `Pedido ${code} criado com sucesso!`,
+            );
+            setPage("orders");
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function Header({
+  page,
+  onHome,
+  onOrders,
+}: {
+  page: string;
+  onHome: () => void;
+  onOrders: () => void;
+}) {
+  return (
+    <header className="navbar">
+      <button
+        className="logo logo-button"
+        onClick={onHome}
+        aria-label="Central TechX"
+      >
+        <img
+          src={`${BASE_URL}brand/logo-transparent.png.png`}
+          alt="Central TechX"
+          className="brand-logo"
+        />
+      </button>
+
+      <nav className="nav-links">
+        <button
+          className={
+            page === "home"
+              ? "active"
+              : ""
+          }
+          onClick={onHome}
+        >
+          INÍCIO
+        </button>
+
+        <a
+          href="#pcs"
+          onClick={onHome}
+        >
+          PCs
+        </a>
+
+        <button
+          className={
+            page === "orders"
+              ? "active"
+              : ""
+          }
+          onClick={onOrders}
+        >
+          PEDIDOS
+        </button>
+
+        <a
+          href="#sobre"
+          onClick={onHome}
+        >
+          SOBRE
+        </a>
+
+        <a
+          href="#contato"
+          onClick={onHome}
+        >
+          CONTATO
+        </a>
+      </nav>
+
+      <button
+        className="whatsapp-button"
+        onClick={() =>
+          window.open(
+            `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(
+              "Olá! Gostaria de falar com a Central TechX.",
+            )}`,
+            "_blank",
+          )
+        }
+      >
+        ◉ &nbsp; FALAR NO WHATSAPP
+      </button>
+    </header>
+  );
+}
+
+function DetailSpec({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="detail-spec">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function Spec({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function Benefit({
+  icon,
+  title,
+  text,
+}: {
+  icon: string;
+  title: string;
+  text: string;
+}) {
+  return (
+    <div className="benefit">
+      <span className="benefit-icon">
+        {icon}
+      </span>
+
+      <div>
+        <strong>{title}</strong>
+        <small>{text}</small>
+      </div>
+    </div>
+  );
+}
+
+function OrderModal({
+  pc,
+  onClose,
+  onCreated,
+}: {
+  pc: PC;
+  onClose: () => void;
+  onCreated: (code: string) => void;
+}) {
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit(
+    event: React.FormEvent,
+  ) {
+    event.preventDefault();
+
+    setSaving(true);
+    setError("");
+
+    let { data: sessionData } =
+      await supabase.auth.getSession();
+
+    if (!sessionData.session) {
+      const { data: anonymousData, error: authError } =
+        await supabase.auth.signInAnonymously();
+
+      if (authError) {
+        setError(
+          "Não foi possível iniciar o pedido. Verifique a configuração do Supabase.",
+        );
+
+        setSaving(false);
+        return;
+      }
+
+      sessionData = {
+        session: anonymousData.session,
+      };
+    }
+
+    const userId =
+      sessionData.session?.user.id;
+
+    if (!userId) {
+      setError(
+        "Sessão do cliente não encontrada.",
+      );
+
+      setSaving(false);
+      return;
+    }
+
+    const { data, error: insertError } =
+      await supabase
+        .from("orders")
+        .insert({
+          customer_id: userId,
+          customer_name: name.trim(),
+          customer_phone: phone.trim(),
+          customer_address: address.trim(),
+          product_id: pc.id,
+          product_name: pc.name,
+          product_price: pc.priceValue,
+          status: "recebido",
+          payment_status: "pendente",
+        })
+        .select("order_code")
+        .single();
+
+    if (insertError || !data) {
+      console.error(insertError);
+
+      setError(
+        "Não foi possível criar o pedido. Confira se o banco do Supabase foi configurado.",
+      );
+    } else {
+      onCreated(data.order_code);
+    }
+
+    setSaving(false);
+  }
+
+  return (
+    <div
+      className="modal-backdrop"
+      onMouseDown={onClose}
+    >
+      <div
+        className="order-modal"
+        onMouseDown={(event) =>
+          event.stopPropagation()
+        }
+      >
+        <button
+          className="modal-close"
+          onClick={onClose}
+          aria-label="Fechar"
+        >
+          ×
+        </button>
+
+        <p className="section-small">
+          FINALIZAR PEDIDO
+        </p>
+
+        <h2>{pc.name}</h2>
+
+        <p className="modal-price">
+          {money(pc.priceValue)}
+        </p>
+
+        <div className="payment-note">
+          💵{" "}
+          <strong>
+            Pagamento na entrega
+          </strong>
+
+          <span>
+            Você paga quando receber seu PC.
+          </span>
+        </div>
+
+        <form
+          onSubmit={submit}
+          className="order-form"
+        >
+          <label>
+            Seu nome
+
+            <input
+              required
+              value={name}
+              onChange={(event) =>
+                setName(event.target.value)
+              }
+              placeholder="Nome completo"
+            />
+          </label>
+
+          <label>
+            WhatsApp
+
+            <input
+              required
+              value={phone}
+              onChange={(event) =>
+                setPhone(event.target.value)
+              }
+              placeholder="(81) 99999-9999"
+            />
+          </label>
+
+          <label>
+            Endereço de entrega
+
+            <textarea
+              required
+              value={address}
+              onChange={(event) =>
+                setAddress(event.target.value)
+              }
+              placeholder="Rua, número, bairro e referência"
+              rows={3}
+            />
+          </label>
+
+          {error && (
+            <p className="form-error">
+              {error}
+            </p>
+          )}
+
+          <button
+            className="submit-order"
+            disabled={saving}
+          >
+            {saving
+              ? "CRIANDO PEDIDO..."
+              : "CONFIRMAR PEDIDO →"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function OrdersPage({
+  orders,
+  loading,
+  onHome,
+  onRefresh,
+  message,
+}: {
+  orders: Order[];
+  loading: boolean;
+  onHome: () => void;
+  onRefresh: () => void;
+  message: string;
+}) {
+  return (
+    <main className="orders-page">
+      <div className="orders-heading">
+        <div>
+          <p className="section-small">
+            CENTRAL TECHX
+          </p>
+
+          <h1>
+            MEUS <span>PEDIDOS</span>
+          </h1>
+
+          <p>
+            Acompanhe o andamento dos seus pedidos em um só lugar.
+          </p>
+        </div>
+
+        <button
+          className="secondary-button compact-button"
+          onClick={onRefresh}
+        >
+          ↻ ATUALIZAR
+        </button>
+      </div>
+
+      {message && (
+        <div className="site-message">
+          {message}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="empty-orders">
+          Carregando seus pedidos...
+        </div>
+      ) : orders.length === 0 ? (
+        <div className="empty-orders">
+          <div className="empty-icon">
+            📦
+          </div>
+
+          <h2>
+            Nenhum pedido por aqui
+          </h2>
+
+          <p>
+            Quando você fizer um pedido, ele aparecerá nesta área.
+          </p>
+
+          <button
+            className="primary-button inline-button"
+            onClick={onHome}
+          >
+            VER PCs
+          </button>
+        </div>
+      ) : (
+        <div className="orders-list">
+          {orders.map((order) => (
+            <OrderCard
+              key={order.id}
+              order={order}
+            />
+          ))}
+        </div>
+      )}
+    </main>
+  );
+}
+
+function OrderCard({
+  order,
+}: {
+  order: Order;
+}) {
+  const info = statusInfo[order.status];
+
+  const steps: OrderStatus[] = [
+    "recebido",
+    "preparo",
+    "caminho",
+    "entregue",
+  ];
+
+  const currentIndex =
+    steps.indexOf(order.status);
+
+  return (
+    <article className="order-card">
+      <div className="order-card-top">
+        <div>
+          <span className="order-code">
+            {order.order_code}
+          </span>
+
+          <h2>{order.product_name}</h2>
+
+          <p>
+            Pedido realizado em{" "}
+            {new Date(
+              order.created_at,
+            ).toLocaleDateString("pt-BR")}
+          </p>
+        </div>
+
+        <div
+          className={`status-pill ${info.className}`}
+        >
+          {info.icon} {info.label}
+        </div>
+      </div>
+
+      <div className="order-timeline">
+        {steps.map((step, index) => (
+          <div
+            className={`timeline-step ${
+              index <= currentIndex
+                ? "done"
+                : ""
+            }`}
+            key={step}
+          >
+            <div className="timeline-dot">
+              {index <= currentIndex
+                ? "✓"
+                : ""}
+            </div>
+
+            <span>
+              {statusInfo[step].label}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <div className="order-card-bottom">
+        <div>
+          <small>PAGAMENTO</small>
+
+          <strong>
+            {order.payment_status ===
+            "pago"
+              ? "🟢 Pago"
+              : order.payment_status ===
+                "cancelado"
+              ? "❌ Cancelado"
+              : "💵 Pendente — na entrega"}
+          </strong>
+        </div>
+
+        <div>
+          <small>VALOR</small>
+
+          <strong>
+            {money(
+              Number(
+                order.product_price,
+              ),
+            )}
+          </strong>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function AdminPage({
+  adminUser,
+  adminLoading,
+  setAdminLoading,
+  orders,
+  setOrders,
+  onLogin,
+  onLogout,
+  error,
+  setError,
+}: {
+  adminUser: boolean;
+  adminLoading: boolean;
+  setAdminLoading: (
+    value: boolean,
+  ) => void;
+  orders: Order[];
+  setOrders: React.Dispatch<
+    React.SetStateAction<Order[]>
+  >;
+  onLogin: () => void;
+  onLogout: () => void;
+  error: string;
+  setError: (value: string) => void;
+}) {
+  const [email, setEmail] =
+    useState("");
+
+  const [password, setPassword] =
+    useState("");
+
+  const [filter, setFilter] =
+    useState<"todos" | OrderStatus>(
+      "todos",
+    );
+
+  useEffect(() => {
+    if (adminUser) {
+      void loadAllOrders();
+    }
+  }, [adminUser]);
+
+  async function login(event: React.FormEvent) {
+  event.preventDefault();
+
+  setAdminLoading(true);
+  setError("");
+
+  const cleanEmail = email.trim();
+
+  console.log("E-mail usado:", cleanEmail);
+  console.log("Senha preenchida:", password.length > 0);
+
+  const {
+    data: authData,
+    error: loginError,
+  } = await supabase.auth.signInWithPassword({
+    email: cleanEmail,
+    password,
+  });
+
+  if (loginError) {
+    console.error("ERRO DE LOGIN:", loginError);
+
+    setError(`Erro de login: ${loginError.message}`);
+
+    setAdminLoading(false);
+    return;
+  }
+
+  console.log(
+    "Login realizado com sucesso:",
+    authData.user?.email
+  );
+
+  const userId = authData.user?.id;
+
+  if (!userId) {
+    await supabase.auth.signOut();
+
+    setError("Não foi possível identificar o usuário.");
+
+    setAdminLoading(false);
+    return;
+  }
+
+  const {
+    data: profile,
+    error: profileError,
+  } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (profileError) {
+    console.error(
+      "ERRO AO VERIFICAR ADMIN:",
+      profileError
+    );
+
+    await supabase.auth.signOut();
+
+    setError(
+      "Não foi possível verificar as permissões da conta."
+    );
+
+    setAdminLoading(false);
+    return;
+  }
+
+  console.log("Perfil encontrado:", profile);
+  console.log("ID DO USUÁRIO:", userId);
+console.log("PERFIL ENCONTRADO:", profile);
+console.log("ERRO DO PERFIL:", profileError);
+
+  if (profile?.role !== "admin") {
+    await supabase.auth.signOut();
+
+    setError(
+      "Esta conta não possui permissão de administrador."
+    );
+
+    setAdminLoading(false);
+    return;
+  }
+
+  setAdminLoading(false);
+  onLogin();
+}
+
+  async function loadAllOrders() {
+    const {
+      data,
+      error: loadError,
+    } = await supabase
+      .from("orders")
+      .select("*")
+      .order("created_at", {
+        ascending: false,
+      });
+
+    if (loadError) {
+      console.error(
+        "Erro ao carregar pedidos do admin:",
+        loadError,
+      );
+
+      setError(
+        "Não foi possível carregar os pedidos.",
+      );
+
+      return;
+    }
+
+    setOrders(
+      (data || []) as Order[],
+    );
+  }
+
+  async function updateOrder(
+    id: number,
+    changes: Partial<
+      Pick<
+        Order,
+        "status" | "payment_status"
+      >
+    >,
+  ) {
+    setError("");
+
+    const {
+      data,
+      error: updateError,
+    } = await supabase
+      .from("orders")
+      .update(changes)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error(updateError);
+
+      setError(
+        "Não foi possível atualizar este pedido.",
+      );
+
+      return;
+    }
+
+    setOrders((current) =>
+      current.map((order) =>
+        order.id === id
+          ? (data as Order)
+          : order,
+      ),
+    );
+  }
+
+  if (!adminUser) {
+    return (
+      <main className="admin-login-page">
+        <div className="admin-login-card">
+          <div className="admin-lock">
+            🔐
+          </div>
+
+          <p className="section-small">
+            ÁREA RESTRITA
+          </p>
+
+          <h1>
+            ADMINISTRAÇÃO
+          </h1>
+
+          <p>
+            Entre com uma conta autorizada para gerenciar os pedidos.
+          </p>
+
+          <form
+            onSubmit={login}
+            className="order-form"
+          >
+            <label>
+              E-mail
+
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(event) =>
+                  setEmail(
+                    event.target.value,
+                  )
+                }
+                placeholder="admin@centraltechx.com"
+              />
+            </label>
+
+            <label>
+              Senha
+
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(event) =>
+                  setPassword(
+                    event.target.value,
+                  )
+                }
+                placeholder="Sua senha"
+              />
+            </label>
+
+            {error && (
+              <p className="form-error">
+                {error}
+              </p>
+            )}
+
+            <button
+              className="submit-order"
+              disabled={adminLoading}
+            >
+              {adminLoading
+                ? "ENTRANDO..."
+                : "ENTRAR NO PAINEL →"}
+            </button>
+          </form>
+        </div>
+      </main>
+    );
+  }
+
+  const filtered =
+    filter === "todos"
+      ? orders
+      : orders.filter(
+          (order) =>
+            order.status === filter,
+        );
+
+  const stats = {
+    total: orders.length,
+
+    recebido: orders.filter(
+      (order) =>
+        order.status ===
+        "recebido",
+    ).length,
+
+    preparo: orders.filter(
+      (order) =>
+        order.status ===
+        "preparo",
+    ).length,
+
+    caminho: orders.filter(
+      (order) =>
+        order.status ===
+        "caminho",
+    ).length,
+
+    entregue: orders.filter(
+      (order) =>
+        order.status ===
+        "entregue",
+    ).length,
+  };
+
+  return (
+    <main className="admin-page">
+      <div className="admin-heading">
+        <div>
+          <p className="section-small">
+            CENTRAL TECHX
+          </p>
+
+          <h1>
+            PAINEL <span>ADMIN</span>
+          </h1>
+
+          <p>
+            Gerencie pedidos e atualize o cliente em tempo real.
+          </p>
+        </div>
+
+        <button
+          className="secondary-button compact-button"
+          onClick={onLogout}
+        >
+          SAIR
+        </button>
+      </div>
+
+      {error && (
+        <div className="form-error admin-error">
+          {error}
+        </div>
+      )}
+
+      <div className="admin-stats">
+        <Stat
+          label="TOTAL"
+          value={stats.total}
+        />
+
+        <Stat
+          label="RECEBIDOS"
+          value={stats.recebido}
+        />
+
+        <Stat
+          label="EM PREPARO"
+          value={stats.preparo}
+        />
+
+        <Stat
+          label="A CAMINHO"
+          value={stats.caminho}
+        />
+
+        <Stat
+          label="ENTREGUES"
+          value={stats.entregue}
+        />
+      </div>
+
+      <div className="admin-toolbar">
+        <div className="admin-filters">
+          {[
+            ["todos", "Todos"],
+            ["recebido", "Recebidos"],
+            ["preparo", "Em preparo"],
+            ["caminho", "A caminho"],
+            ["entregue", "Entregues"],
+          ].map(
+            ([value, label]) => (
+              <button
+                key={value}
+                className={
+                  filter === value
+                    ? "selected"
+                    : ""
+                }
+                onClick={() =>
+                  setFilter(
+                    value as
+                      | "todos"
+                      | OrderStatus,
+                  )
+                }
+              >
+                {label}
+              </button>
+            ),
+          )}
+        </div>
+
+        <button
+          className="secondary-button compact-button"
+          onClick={loadAllOrders}
+        >
+          ↻ ATUALIZAR
+        </button>
+      </div>
+
+      <div className="admin-orders">
+        {filtered.length === 0 ? (
+          <div className="empty-orders">
+            Nenhum pedido nesta categoria.
+          </div>
+        ) : (
+          filtered.map((order) => (
+            <AdminOrderRow
+              key={order.id}
+              order={order}
+              onUpdate={updateOrder}
+            />
+          ))
+        )}
+      </div>
+    </main>
+  );
+}
+
+function Stat({
+  label,
+  value,
+}: {
+  label: string;
+  value: number;
+}) {
+  return (
+    <div className="admin-stat">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function AdminOrderRow({
+  order,
+  onUpdate,
+}: {
+  order: Order;
+  onUpdate: (
+    id: number,
+    changes: Partial<
+      Pick<
+        Order,
+        "status" | "payment_status"
+      >
+    >,
+  ) => void;
+}) {
+  const info = statusInfo[order.status];
+
+  return (
+    <article className="admin-order-row">
+      <div className="admin-order-main">
+        <div>
+          <span className="order-code">
+            {order.order_code}
+          </span>
+
+          <h2>
+            {order.product_name}
+          </h2>
+
+          <p>
+            <strong>
+              {order.customer_name}
+            </strong>{" "}
+            · {order.customer_phone}
+          </p>
+
+          <p className="admin-address">
+            {order.customer_address}
+          </p>
+        </div>
+
+        <div
+          className={`status-pill ${info.className}`}
+        >
+          {info.icon} {info.label}
+        </div>
+      </div>
+
+      <div className="admin-actions">
+        <label>
+          STATUS
+
+          <select
+            value={order.status}
+            onChange={(event) =>
+              onUpdate(order.id, {
+                status:
+                  event.target
+                    .value as OrderStatus,
+              })
+            }
+          >
+            <option value="recebido">
+              📦 Pedido recebido
+            </option>
+
+            <option value="preparo">
+              🛠️ Pedido em preparo
+            </option>
+
+            <option value="caminho">
+              🚚 A caminho
+            </option>
+
+            <option value="entregue">
+              ✅ Entregue
+            </option>
+          </select>
+        </label>
+
+        <label>
+          PAGAMENTO
+
+          <select
+            value={order.payment_status}
+            onChange={(event) =>
+              onUpdate(order.id, {
+                payment_status:
+                  event.target
+                    .value as PaymentStatus,
+              })
+            }
+          >
+            <option value="pendente">
+              💵 Pendente
+            </option>
+
+            <option value="pago">
+              🟢 Pago
+            </option>
+
+            <option value="cancelado">
+              ❌ Cancelado
+            </option>
+          </select>
+        </label>
+
+        <div className="admin-price">
+          <small>VALOR</small>
+
+          <strong>
+            {money(
+              Number(
+                order.product_price,
+              ),
+            )}
+          </strong>
+        </div>
+      </div>
+    </article>
   );
 }
 
