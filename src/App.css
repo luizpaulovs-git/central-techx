@@ -2182,16 +2182,26 @@ a {
 }
 
 /* Links */
+.navbar {
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  padding: 15px;
+}
 
 .nav-links {
   display: flex;
-  gap: 15px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
   flex-wrap: wrap;
+  width: 100%;
 }
 
 .nav-links button,
 .nav-links a {
-  display: block;
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .nav-links a {

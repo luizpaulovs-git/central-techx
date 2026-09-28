@@ -40,7 +40,7 @@ const pcs: PC[] = [
     price: "R$ 799,90",
     priceValue: 799.9,
     image: `${BASE_URL}pcs/techx-start.png`,
-    stock: true,
+    stock: false,
   },
   {
     id: "techx-gamer",
