@@ -2183,6 +2183,17 @@ a {
 
 /* Links */
 
+.nav-links {
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.nav-links button,
+.nav-links a {
+  display: block;
+}
+
 .nav-links a {
   position: relative;
 
