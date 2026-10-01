@@ -30,7 +30,7 @@ type PC = {
 const pcs: PC[] = [
   {
     id: "techx-start",
-    name: "TechX Start",
+    name: "PC Start",
     category: "PC DE ENTRADA",
     description: "Ideal para estudos, trabalho e uso diário.",
     processor: "Intel I5 3470",
@@ -44,7 +44,7 @@ const pcs: PC[] = [
   },
   {
     id: "techx-gamer",
-    name: "TechX Médio",
+    name: "PC Médio",
     category: "PC INTERMEDIÁRIO",
     description: "Performance e custo-benefício para seus jogos.",
     processor: "Ryzen 5 2600",
@@ -58,7 +58,7 @@ const pcs: PC[] = [
   },
   {
     id: "techx-pro",
-    name: "TechX Pro",
+    name: "PC Pro",
     category: "PC GAMER",
     description: "Alto desempenho para jogos e criação de conteúdo.",
     processor: "Ryzen 5 5600",
@@ -72,7 +72,7 @@ const pcs: PC[] = [
   },
   {
     id: "techx-extreme",
-    name: "TechX Extreme",
+    name: "PC Extreme",
     category: "ALTO DESEMPENHO",
     description: "Para quem exige o máximo de desempenho.",
     processor: "Ryzen 7 7700",
@@ -460,78 +460,40 @@ function App() {
       </div>
 
       <main>
-        <section
-          className="hero"
-          id="inicio"
-        >
-          <div className="hero-content">
-            <p className="hero-small">
-              CENTRAL TECH X
-            </p>
+        <section className="hero hero-reference" id="inicio">
+  <div className="hero-content">
+    <p className="hero-small">CENTRAL TECHX</p>
 
-            <h1>
-              SEU PRÓXIMO
-              <br />
-              PC COMEÇA
-              <br />
-              <span>AQUI.</span>
-            </h1>
+    <h1>
+      TECNOLOGIA
+      <br />
+      SEM COMPLICAÇÃO.
+    </h1>
 
-            <p className="hero-description">
-              Desempenho, qualidade e tecnologia para
-              <br />
-              jogar, trabalhar e estudar sem limites.
-            </p>
+    <p className="hero-description">
+      Computadores, assistência e soluções
+      <br />
+      em tecnologia para o seu dia a dia.
+    </p>
 
-            <div className="hero-buttons">
-              <a
-                href="#pcs"
-                className="primary-button"
-              >
-                🖥️ &nbsp; VER PCs
-              </a>
+    <div className="hero-buttons">
+      <a href="#pcs" className="primary-button">
+        VER PRODUTOS <span>→</span>
+      </a>
 
-              <button
-                className="secondary-button"
-                onClick={() =>
-                  contactWhatsApp()
-                }
-              >
-                ◉ &nbsp; FALE CONOSCO
-              </button>
-            </div>
+      <button
+        className="secondary-button"
+        onClick={() => contactWhatsApp()}
+      >
+        SOBRE NÓS
+      </button>
+    </div>
+  </div>
 
-            <div className="hero-benefits">
-              <Benefit
-                icon="♢"
-                title="GARANTIA"
-                text="De verdade"
-              />
-
-              <Benefit
-                icon="⚙"
-                title="PEÇAS DE QUALIDADE"
-                text="Das melhores marcas"
-              />
-
-              <Benefit
-                icon="▣"
-                title="MONTAGEM"
-                text="Profissional"
-              />
-            </div>
-          </div>
-
-          <div className="hero-pc">
-            <div className="hero-image-glow" />
-
-            <img
-              src={`${BASE_URL}hero/central-pc.png`}
-              alt="PC Gamer Central TechX"
-              className="hero-pc-image"
-            />
-          </div>
-        </section>
+  <div className="hero-reference-visual" aria-hidden="true">
+    <div className="hero-reference-frame" />
+  </div>
+</section>
 
         <section
           className="products"
@@ -656,9 +618,20 @@ function App() {
             </h2>
 
             <small>
-              Escolha as peças e nós montamos para você ou contrate nossos
-              serviços.
-            </small>
+  Escolha as peças e nós montamos para você ou contrate nossos
+  serviços.
+</small>
+
+<button
+  className="hero-custom-pc-button"
+  onClick={() => {
+    document.getElementById("pcs")?.scrollIntoView({
+      behavior: "smooth",
+    });
+  }}
+>
+  Monte seu PC do seu jeito
+</button>
           </div>
         </section>
 
@@ -820,29 +793,6 @@ function Spec({
     <div>
       <span>{label}</span>
       <strong>{value}</strong>
-    </div>
-  );
-}
-
-function Benefit({
-  icon,
-  title,
-  text,
-}: {
-  icon: string;
-  title: string;
-  text: string;
-}) {
-  return (
-    <div className="benefit">
-      <span className="benefit-icon">
-        {icon}
-      </span>
-
-      <div>
-        <strong>{title}</strong>
-        <small>{text}</small>
-      </div>
     </div>
   );
 }
