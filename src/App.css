@@ -1560,3 +1560,167 @@ a { color: inherit; text-decoration: none; }
     font-size: 8px;
   }
 }
+
+/* =========================================================
+   CORREÇÃO FINAL — MOBILE HEADER + FOOTER
+   Baseado nos problemas vistos nas capturas de tela.
+   ========================================================= */
+
+/* A logo usada no projeto ainda é azul. Mantemos o arquivo original,
+   mas neutralizamos sua cor para respeitar a identidade preto/branco/cinza. */
+.brand-logo,
+.footer-brand-logo {
+  filter: grayscale(1) brightness(0) invert(1);
+}
+
+/* Impede a imagem do rodapé de criar um espaço vertical enorme por causa
+   da área transparente existente no arquivo da logo. */
+.footer-brand-logo {
+  width: 110px;
+  height: 58px;
+  object-fit: contain;
+  object-position: left center;
+}
+
+/* ========================= HEADER MOBILE ========================= */
+@media (max-width: 800px) {
+  .navbar {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "logo whatsapp"
+      "nav nav";
+    align-items: center;
+    gap: 12px 14px;
+    padding: 12px 18px 10px;
+    overflow: hidden;
+  }
+
+  .logo-button {
+    grid-area: logo;
+    min-width: 0;
+    justify-self: start;
+  }
+
+  .brand-logo {
+    width: 118px;
+    max-width: 118px;
+    height: 44px;
+    object-fit: contain;
+    object-position: left center;
+  }
+
+  .whatsapp-button {
+    grid-area: whatsapp;
+    justify-self: end;
+    margin-left: 0;
+    white-space: nowrap;
+    padding: 11px 13px;
+    font-size: 10px;
+  }
+
+  .nav-links {
+    grid-area: nav;
+    width: 100%;
+    min-width: 0;
+    display: flex;
+    justify-content: flex-start;
+    gap: 24px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 2px 2px 5px;
+    scrollbar-width: none;
+  }
+
+  .nav-links::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-links button {
+    flex: 0 0 auto;
+    padding: 6px 0;
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 420px) {
+  .navbar {
+    padding-inline: 16px;
+    gap: 10px 10px;
+  }
+
+  .brand-logo {
+    width: 105px;
+    max-width: 105px;
+    height: 40px;
+  }
+
+  .whatsapp-button {
+    max-width: 178px;
+    padding: 10px 11px;
+    font-size: 9px;
+  }
+
+  .nav-links {
+    gap: 21px;
+  }
+
+  .nav-links button {
+    font-size: 9px;
+  }
+}
+
+/* ========================= FOOTER MOBILE ========================= */
+@media (max-width: 620px) {
+  .footer {
+    padding: 42px 20px 18px;
+  }
+
+  .footer-main {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 32px 28px;
+    align-items: start;
+    padding-bottom: 28px;
+  }
+
+  .footer-brand {
+    min-width: 0;
+  }
+
+  .footer-brand-logo {
+    width: 100px;
+    height: 48px;
+    margin: 0;
+  }
+
+  .footer-brand p {
+    max-width: 180px;
+    margin-top: 10px;
+    font-size: 11px;
+    line-height: 1.55;
+  }
+
+  .footer-column {
+    min-width: 0;
+    gap: 10px;
+  }
+
+  .footer-column > strong {
+    margin-bottom: 5px;
+    font-size: 8px;
+  }
+
+  .footer-column button {
+    font-size: 11px;
+  }
+
+  .footer-bottom {
+    padding-top: 16px;
+    gap: 13px;
+  }
+
+  .footer-bottom p {
+    line-height: 1.5;
+  }
+}
