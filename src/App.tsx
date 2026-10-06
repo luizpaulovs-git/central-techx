@@ -404,12 +404,20 @@ function App() {
         </section>
 
         <section className="custom-build" id="sobre">
-          <div>
+          <div className="motherboard-visual" aria-hidden="true">
+            <img
+              src={`${BASE_URL}motherboard-clean.png`}
+              alt=""
+              className="motherboard-image"
+            />
+          </div>
+
+          <div className="custom-build-content">
             <p>MONTE O SEU PC</p>
             <h2>DO SEU <span>JEITO!</span></h2>
             <small>Escolha as peças e nós montamos para você ou contrate nossos serviços.</small>
             <button className="hero-custom-pc-button" onClick={() => scrollToSection("pcs")}>
-              Monte seu PC do seu jeito
+              Monte seu PC do seu jeito <span>→</span>
             </button>
           </div>
         </section>
