@@ -581,11 +581,14 @@ a { color: inherit; text-decoration: none; }
 /* ========================= CUSTOM BUILD ========================= */
 
 .custom-build {
-  max-width: var(--max);
-  margin: 20px auto 0;
-  padding: 65px clamp(25px, 5vw, 70px);
+  width: 100%;
+  max-width: none;
+  margin: 20px 0 0;
+  padding: 65px clamp(25px, 7vw, 110px);
+
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
+
   background: #080808;
 }
 
@@ -1937,5 +1940,30 @@ a { color: inherit; text-decoration: none; }
 
   .custom-build-content p {
     font-size: 9px;
+  }
+}
+/* =========================
+   AJUSTE DESKTOP — FOOTER
+   ========================= */
+
+@media (min-width: 801px) {
+
+  .custom-build {
+    min-height: 460px;
+    padding-top: 55px;
+    padding-bottom: 55px;
+  }
+
+  .footer {
+    padding-top: 38px;
+    padding-bottom: 16px;
+  }
+
+  .footer-main {
+    padding-bottom: 28px;
+  }
+
+  .footer-bottom {
+    padding-top: 14px;
   }
 }
