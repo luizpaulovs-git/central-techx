@@ -27,7 +27,7 @@ type PC = {
   featured?: boolean;
 };
 
-const pcs: PC[] = [
+const initialPCs: PC[] = [
   {
     id: "techx-start",
     name: "PC Start",
@@ -86,6 +86,48 @@ const pcs: PC[] = [
   },
 ];
 
+type ProductForm = {
+  name: string;
+  category: string;
+  description: string;
+  processor: string;
+  gpu: string;
+  ram: string;
+  storage: string;
+  price: string;
+  image: string;
+  stock: boolean;
+  featured: boolean;
+};
+
+const emptyProductForm: ProductForm = {
+  name: "",
+  category: "PC PERSONALIZADO",
+  description: "",
+  processor: "",
+  gpu: "",
+  ram: "",
+  storage: "",
+  price: "",
+  image: "pcs/techx-start.png",
+  stock: false,
+  featured: false,
+};
+
+function productImageFromDatabase(image: unknown): string {
+  const value = typeof image === "string" ? image.trim() : "";
+  if (!value) return `${BASE_URL}pcs/techx-start.png`;
+  if (/^https?:\/\//i.test(value)) return value;
+  return `${BASE_URL}${value.replace(/^\/+/, "")}`;
+}
+
+function productImageForDatabase(image: string): string {
+  const value = image.trim();
+  if (/^https?:\/\//i.test(value)) return value;
+  const withoutBase = value.startsWith(BASE_URL) ? value.slice(BASE_URL.length) : value;
+  return withoutBase.replace(/^\/+/, "");
+}
+
 const statusInfo: Record<OrderStatus, { label: string; icon: string; className: string }> = {
   recebido: { label: "Pedido recebido", icon: "📦", className: "status-recebido" },
   preparo: { label: "Pedido em preparo", icon: "🛠️", className: "status-preparo" },
@@ -111,15 +153,63 @@ function money(value: number) {
 }
 
 function App() {
-  const [page, setPage] = useState<"home" | "orders" | "admin">("home");
+  const [page, setPage] = useState<"home" | "orders" | "admin" | "account">(() =>
+    typeof window !== "undefined" && window.location.hash.includes("type=recovery")
+      ? "account"
+      : "home",
+  );
   const [selectedPC, setSelectedPC] = useState<PC | null>(null);
   const [orderPC, setOrderPC] = useState<PC | null>(null);
+  const [pcs, setPcs] = useState<PC[]>(initialPCs);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [adminUser, setAdminUser] = useState(false);
   const [adminLoading, setAdminLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [adminError, setAdminError] = useState("");
+
+  async function loadProducts() {
+    // A vitrine continua mostrando os quatro PCs locais caso a tabela ainda não exista.
+    const { data, error } = await supabase
+      .from("products" as any)
+      .select("*")
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.warn("Não foi possível carregar produtos do Supabase; mantendo a vitrine local.", error.message);
+      return;
+    }
+
+    if (!data) return;
+    if (data.length === 0) {
+      setPcs([]);
+      return;
+    }
+
+    const loadedProducts: PC[] = data.map((row: any) => {
+      const priceValue = Number(row.price ?? 0);
+      return {
+        id: String(row.id),
+        name: String(row.name ?? "Produto"),
+        category: String(row.category ?? "COMPUTADOR"),
+        description: String(row.description ?? ""),
+        processor: String(row.processor ?? "Não informado"),
+        gpu: String(row.gpu ?? "Não informado"),
+        ram: String(row.ram ?? "Não informado"),
+        storage: String(row.storage ?? "Não informado"),
+        price: money(priceValue),
+        priceValue,
+        image: productImageFromDatabase(row.image),
+        stock: Boolean(row.stock),
+        featured: Boolean(row.featured),
+      };
+    });
+    setPcs(loadedProducts);
+  }
+
+  useEffect(() => {
+    void loadProducts();
+  }, []);
 
   async function ensureCustomerSession() {
     const { data } = await supabase.auth.getSession();
@@ -222,10 +312,25 @@ function App() {
     setOrderPC(pc);
   }
 
+  if (page === "account") {
+    return (
+      <div className="site">
+        <Header
+          page={page}
+          onHome={goHome}
+          onOrders={() => setPage("orders")}
+          onAccount={() => setPage("account")}
+          onSection={scrollToSection}
+        />
+        <AccountPage onAuthenticated={() => setPage("orders")} />
+      </div>
+    );
+  }
+
   if (page === "orders") {
     return (
       <div className="site">
-        <Header page={page} onHome={goHome} onOrders={() => setPage("orders")} onSection={scrollToSection} />
+        <Header page={page} onHome={goHome} onOrders={() => setPage("orders")} onAccount={() => setPage("account")} onSection={scrollToSection} />
         <OrdersPage orders={orders} loading={loadingOrders} onHome={goHome} onRefresh={loadOrders} message={message} />
       </div>
     );
@@ -234,7 +339,7 @@ function App() {
   if (page === "admin") {
     return (
       <div className="site">
-        <Header page={page} onHome={goHome} onOrders={() => setPage("orders")} onSection={scrollToSection} />
+        <Header page={page} onHome={goHome} onOrders={() => setPage("orders")} onAccount={() => setPage("account")} onSection={scrollToSection} />
         <AdminPage
           adminUser={adminUser}
           adminLoading={adminLoading}
@@ -250,6 +355,8 @@ function App() {
           }}
           error={adminError}
           setError={setAdminError}
+          pcs={pcs}
+          onProductsReload={loadProducts}
         />
       </div>
     );
@@ -258,7 +365,7 @@ function App() {
   if (selectedPC) {
     return (
       <div className="site">
-        <Header page="pcs" onHome={goHome} onOrders={() => setPage("orders")} onSection={scrollToSection} />
+        <Header page="pcs" onHome={goHome} onOrders={() => setPage("orders")} onAccount={() => setPage("account")} onSection={scrollToSection} />
         <div className="important-notice">
           <span className="notice-icon">⚠</span>
           <div>
@@ -312,7 +419,7 @@ function App() {
 
   return (
     <div className="site">
-      <Header page="home" onHome={goHome} onOrders={() => setPage("orders")} onSection={scrollToSection} />
+      <Header page="home" onHome={goHome} onOrders={() => setPage("orders")} onAccount={() => setPage("account")} onSection={scrollToSection} />
 
       <div className="important-notice">
         <span className="notice-icon">⚠</span>
@@ -416,7 +523,7 @@ function App() {
             <p>MONTE O SEU PC</p>
             <h2>DO SEU <span>JEITO!</span></h2>
             <small>Escolha as peças e nós montamos para você ou contrate nossos serviços.</small>
-            <button className="hero-custom-pc-button" onClick={() => scrollToSection("pcs")}>
+            <button type="button" className="hero-custom-pc-button" onClick={() => contactWhatsApp()}>
               Monte seu PC do seu jeito <span>→</span>
             </button>
           </div>
@@ -443,6 +550,7 @@ function App() {
               <strong>ATENDIMENTO</strong>
               <button onClick={() => contactWhatsApp()}>WhatsApp</button>
               <button onClick={() => setPage("orders")}>Meus pedidos</button>
+              <button onClick={() => setPage("account")}>Minha conta</button>
             </div>
 
             <div className="footer-column footer-employee-column">
@@ -479,15 +587,252 @@ function App() {
   );
 }
 
+type AccountMode = "login" | "signup" | "recover" | "reset";
+
+function AccountPage({ onAuthenticated }: { onAuthenticated: () => void }) {
+  const [mode, setMode] = useState<AccountMode>(() =>
+    typeof window !== "undefined" && window.location.hash.includes("type=recovery")
+      ? "reset"
+      : "login",
+  );
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [currentEmail, setCurrentEmail] = useState<string | null>(null);
+  const [isAnonymous, setIsAnonymous] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+
+    async function readSession() {
+      const { data } = await supabase.auth.getSession();
+      if (!active) return;
+      const user = data.session?.user;
+      setCurrentEmail(user?.email ?? null);
+      setIsAnonymous(Boolean(user?.is_anonymous));
+      setCheckingSession(false);
+    }
+
+    void readSession();
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
+      if (!active) return;
+      setCurrentEmail(session?.user.email ?? null);
+      setIsAnonymous(Boolean(session?.user.is_anonymous));
+      setCheckingSession(false);
+    });
+
+    return () => {
+      active = false;
+      listener.subscription.unsubscribe();
+    };
+  }, []);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setLoading(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const normalizedEmail = email.trim().toLowerCase();
+
+      if (mode === "recover") {
+        const redirectUrl = new URL(BASE_URL, window.location.origin).toString();
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+          normalizedEmail,
+          { redirectTo: redirectUrl },
+        );
+        if (resetError) throw resetError;
+        setMessage("Se o endereço estiver cadastrado, enviaremos um e-mail com as instruções de recuperação.");
+        return;
+      }
+
+      if (mode === "reset") {
+        const { error: updateError } = await supabase.auth.updateUser({ password });
+        if (updateError) throw updateError;
+        setPassword("");
+        setMode("login");
+        setMessage("Senha atualizada com sucesso. Você já pode entrar com sua nova senha.");
+        window.history.replaceState(null, document.title, window.location.pathname + window.location.search);
+        return;
+      }
+
+      if (mode === "login") {
+        const { error: loginError } = await supabase.auth.signInWithPassword({
+          email: normalizedEmail,
+          password,
+        });
+        if (loginError) throw loginError;
+        onAuthenticated();
+        return;
+      }
+
+      const { data: existing } = await supabase.auth.getSession();
+      const existingUser = existing.session?.user;
+
+      if (existingUser?.is_anonymous) {
+        // Atualiza a sessão anônima existente para preservar o mesmo user ID
+        // associado aos pedidos já criados nesta sessão.
+        const { error: upgradeError } = await supabase.auth.updateUser({
+          email: normalizedEmail,
+          password,
+          data: { full_name: name.trim() },
+        });
+        if (upgradeError) throw upgradeError;
+
+        const { data: refreshed } = await supabase.auth.getSession();
+        if (refreshed.session?.user && !refreshed.session.user.is_anonymous) {
+          onAuthenticated();
+        } else {
+          setMessage("Cadastro enviado. Confira seu e-mail para confirmar o endereço e concluir a ativação da conta. Mantenha esta sessão neste dispositivo até confirmar.");
+        }
+        return;
+      }
+
+      const { data: signupData, error: signupError } = await supabase.auth.signUp({
+        email: normalizedEmail,
+        password,
+        options: { data: { full_name: name.trim() } },
+      });
+      if (signupError) throw signupError;
+
+      if (signupData.session) {
+        onAuthenticated();
+      } else {
+        setMessage("Cadastro iniciado. Confira seu e-mail para confirmar a conta antes de entrar.");
+      }
+    } catch (err) {
+      console.error("Erro na conta do cliente:", err);
+      const raw = err instanceof Error ? err.message : "Não foi possível concluir a operação.";
+      setError(raw);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function logout() {
+    setLoading(true);
+    setError("");
+    const { error: logoutError } = await supabase.auth.signOut();
+    if (logoutError) {
+      setError(logoutError.message);
+    } else {
+      setCurrentEmail(null);
+      setIsAnonymous(false);
+      setPassword("");
+      setMessage("Você saiu da sua conta.");
+      setMode("login");
+    }
+    setLoading(false);
+  }
+
+  return (
+    <main className="account-page">
+      <div className="account-heading">
+        <p className="section-small">CENTRAL TECHX</p>
+        <h1>MINHA <span>CONTA</span></h1>
+        <p>Acesse sua conta e acompanhe seus pedidos em um só lugar.</p>
+      </div>
+
+      <section className="account-card">
+        {checkingSession ? (
+          <p className="account-muted">Verificando sua sessão...</p>
+        ) : currentEmail && !isAnonymous && mode !== "reset" ? (
+          <div className="account-signed-in">
+            <div className="account-symbol">✓</div>
+            <h2>Você está conectado</h2>
+            <p className="account-muted">{currentEmail}</p>
+            <button type="button" className="submit-order" onClick={onAuthenticated}>
+              VER MEUS PEDIDOS
+            </button>
+            <button type="button" className="secondary-button account-secondary" onClick={() => void logout()} disabled={loading}>
+              {loading ? "AGUARDE..." : "SAIR DA CONTA"}
+            </button>
+          </div>
+        ) : (
+          <>
+            <h2>
+              {mode === "login" ? "Entrar na conta" :
+                mode === "signup" ? "Criar conta de cliente" :
+                  mode === "recover" ? "Recuperar senha" : "Criar nova senha"}
+            </h2>
+            <p className="account-muted">
+              {mode === "signup" ? "Cadastre-se para acompanhar seus pedidos." :
+                mode === "recover" ? "Informe o e-mail associado à sua conta." :
+                  mode === "reset" ? "Escolha uma nova senha para sua conta." :
+                    "Entre com seu e-mail e senha cadastrados."}
+            </p>
+
+            <form onSubmit={submit} className="order-form">
+              {mode === "signup" && (
+                <label>
+                  Nome completo
+                  <input required autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Seu nome completo" />
+                </label>
+              )}
+
+              {mode !== "reset" && (
+                <label>
+                  E-mail
+                  <input required type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="voce@exemplo.com" />
+                </label>
+              )}
+
+              {(mode === "login" || mode === "signup" || mode === "reset") && (
+                <label>
+                  {mode === "reset" ? "Nova senha" : "Senha"}
+                  <input required type="password" minLength={6} autoComplete={mode === "login" ? "current-password" : "new-password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Mínimo de 6 caracteres" />
+                </label>
+              )}
+
+              {error && <p className="form-error">{error}</p>}
+              {message && <p className="site-message">{message}</p>}
+
+              <button className="submit-order" disabled={loading}>
+                {loading ? "AGUARDE..." :
+                  mode === "login" ? "ENTRAR" :
+                    mode === "signup" ? "CRIAR CONTA" :
+                      mode === "recover" ? "ENVIAR INSTRUÇÕES" : "SALVAR NOVA SENHA"}
+              </button>
+            </form>
+
+            <div className="account-actions">
+              {mode === "login" && (
+                <>
+                  <button type="button" className="secondary-button" onClick={() => { setMode("signup"); setError(""); setMessage(""); }}>CRIAR CONTA</button>
+                  <button type="button" className="secondary-button" onClick={() => { setMode("recover"); setError(""); setMessage(""); }}>ESQUECI MINHA SENHA</button>
+                </>
+              )}
+              {mode !== "login" && mode !== "reset" && (
+                <button type="button" className="secondary-button" onClick={() => { setMode("login"); setError(""); setMessage(""); }}>VOLTAR AO LOGIN</button>
+              )}
+              {mode === "reset" && (
+                <button type="button" className="secondary-button" onClick={() => { setMode("login"); setError(""); setMessage(""); }}>CANCELAR</button>
+              )}
+            </div>
+          </>
+        )}
+      </section>
+    </main>
+  );
+}
+
 function Header({
   page,
   onHome,
   onOrders,
+  onAccount,
   onSection,
 }: {
   page: string;
   onHome: () => void;
   onOrders: () => void;
+  onAccount: () => void;
   onSection: (id: string) => void;
 }) {
   return (
@@ -500,6 +845,7 @@ function Header({
         <button className={page === "home" ? "active" : ""} onClick={onHome}>INÍCIO</button>
         <button className={page === "pcs" ? "active" : ""} onClick={() => onSection("pcs")}>PCs</button>
         <button className={page === "orders" ? "active" : ""} onClick={onOrders}>PEDIDOS</button>
+        <button className={page === "account" ? "active" : ""} onClick={onAccount}>MINHA CONTA</button>
         <button onClick={() => onSection("sobre")}>SOBRE</button>
         <button onClick={() => onSection("contato")}>CONTATO</button>
       </nav>
@@ -744,6 +1090,8 @@ function AdminPage({
   onLogout,
   error,
   setError,
+  pcs,
+  onProductsReload,
 }: {
   adminUser: boolean;
   adminLoading: boolean;
@@ -754,10 +1102,16 @@ function AdminPage({
   onLogout: () => void;
   error: string;
   setError: (value: string) => void;
+  pcs: PC[];
+  onProductsReload: () => Promise<void>;
 }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [filter, setFilter] = useState<"todos" | OrderStatus>("todos");
+  const [adminTab, setAdminTab] = useState<"orders" | "products">("orders");
+  const [productForm, setProductForm] = useState<ProductForm>(emptyProductForm);
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [savingProduct, setSavingProduct] = useState(false);
 
   useEffect(() => {
     if (adminUser) void loadAllOrders();
@@ -853,6 +1207,95 @@ function AdminPage({
     setOrders((current) => current.map((order) => order.id === id ? (data as Order) : order));
   }
 
+  function editProduct(pc: PC) {
+    setEditingProductId(pc.id);
+    setProductForm({
+      name: pc.name,
+      category: pc.category,
+      description: pc.description,
+      processor: pc.processor,
+      gpu: pc.gpu,
+      ram: pc.ram,
+      storage: pc.storage,
+      price: String(pc.priceValue),
+      image: pc.image,
+      stock: pc.stock,
+      featured: Boolean(pc.featured),
+    });
+    setError("");
+    setAdminTab("products");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function resetProductForm() {
+    setEditingProductId(null);
+    setProductForm(emptyProductForm);
+  }
+
+  async function saveProduct(event: FormEvent) {
+    event.preventDefault();
+    setSavingProduct(true);
+    setError("");
+
+    const priceValue = Number(productForm.price.replace(",", "."));
+    if (!Number.isFinite(priceValue) || priceValue < 0) {
+      setError("Informe um preço válido, usando apenas números e ponto ou vírgula decimal.");
+      setSavingProduct(false);
+      return;
+    }
+
+    const productId = editingProductId || `product-${Date.now()}`;
+    const payload = {
+      id: productId,
+      name: productForm.name.trim(),
+      category: productForm.category.trim(),
+      description: productForm.description.trim(),
+      processor: productForm.processor.trim(),
+      gpu: productForm.gpu.trim(),
+      ram: productForm.ram.trim(),
+      storage: productForm.storage.trim(),
+      price: priceValue,
+      image: productImageForDatabase(productForm.image),
+      stock: productForm.stock,
+      featured: productForm.featured,
+    };
+
+    const { error: saveError } = await supabase
+      .from("products" as any)
+      .upsert(payload, { onConflict: "id" });
+
+    if (saveError) {
+      console.error("Erro ao salvar produto:", saveError);
+      setError(`Não foi possível salvar o produto. ${saveError.message}`);
+      setSavingProduct(false);
+      return;
+    }
+
+    await onProductsReload();
+    resetProductForm();
+    setError("Produto salvo com sucesso.");
+    setSavingProduct(false);
+  }
+
+  async function deleteProduct(productId: string) {
+    if (!window.confirm("Tem certeza que deseja remover este produto da vitrine?")) return;
+    setError("");
+    const { error: deleteError } = await supabase
+      .from("products" as any)
+      .delete()
+      .eq("id", productId);
+
+    if (deleteError) {
+      console.error("Erro ao remover produto:", deleteError);
+      setError(`Não foi possível remover o produto. ${deleteError.message}`);
+      return;
+    }
+
+    if (editingProductId === productId) resetProductForm();
+    await onProductsReload();
+    setError("Produto removido da vitrine.");
+  }
+
   if (!adminUser) {
     return (
       <main className="admin-login-page">
@@ -900,52 +1343,110 @@ function AdminPage({
         <div>
           <p className="section-small">CENTRAL TECHX</p>
           <h1>PAINEL <span>ADMIN</span></h1>
-          <p>Gerencie pedidos e atualize o cliente em tempo real.</p>
+          <p>Gerencie pedidos, catálogo, preços, especificações e estoque.</p>
         </div>
         <button className="secondary-button compact-button" onClick={onLogout}>SAIR</button>
       </div>
 
       {error && <div className="form-error admin-error">{error}</div>}
 
-      <div className="admin-stats">
-        <Stat label="TOTAL" value={stats.total} />
-        <Stat label="RECEBIDOS" value={stats.recebido} />
-        <Stat label="EM PREPARO" value={stats.preparo} />
-        <Stat label="A CAMINHO" value={stats.caminho} />
-        <Stat label="ENTREGUES" value={stats.entregue} />
+      <div className="admin-tabs">
+        <button className={adminTab === "orders" ? "selected" : ""} onClick={() => setAdminTab("orders")}>PEDIDOS</button>
+        <button className={adminTab === "products" ? "selected" : ""} onClick={() => setAdminTab("products")}>PRODUTOS E PCs</button>
       </div>
 
-      <div className="admin-toolbar">
-        <div className="admin-filters">
-          {[
-            ["todos", "Todos"],
-            ["recebido", "Recebidos"],
-            ["preparo", "Em preparo"],
-            ["caminho", "A caminho"],
-            ["entregue", "Entregues"],
-          ].map(([value, label]) => (
-            <button
-              key={value}
-              className={filter === value ? "selected" : ""}
-              onClick={() => setFilter(value as "todos" | OrderStatus)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+      {adminTab === "orders" ? (
+        <>
+          <div className="admin-stats">
+            <Stat label="TOTAL" value={stats.total} />
+            <Stat label="RECEBIDOS" value={stats.recebido} />
+            <Stat label="EM PREPARO" value={stats.preparo} />
+            <Stat label="A CAMINHO" value={stats.caminho} />
+            <Stat label="ENTREGUES" value={stats.entregue} />
+          </div>
 
-        <button className="secondary-button compact-button" onClick={loadAllOrders}>↻ ATUALIZAR</button>
-      </div>
+          <div className="admin-toolbar">
+            <div className="admin-filters">
+              {[
+                ["todos", "Todos"],
+                ["recebido", "Recebidos"],
+                ["preparo", "Em preparo"],
+                ["caminho", "A caminho"],
+                ["entregue", "Entregues"],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  className={filter === value ? "selected" : ""}
+                  onClick={() => setFilter(value as "todos" | OrderStatus)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <button className="secondary-button compact-button" onClick={loadAllOrders}>↻ ATUALIZAR</button>
+          </div>
 
-      <div className="admin-orders">
-        {filtered.length === 0 ? (
-          <div className="empty-orders">Nenhum pedido nesta categoria.</div>
-        ) : (
-          filtered.map((order) => (
-            <AdminOrderRow key={order.id} order={order} onUpdate={updateOrder} />
-          ))
-        )}
-      </div>
+          <div className="admin-orders">
+            {filtered.length === 0 ? (
+              <div className="empty-orders">Nenhum pedido nesta categoria.</div>
+            ) : (
+              filtered.map((order) => (
+                <AdminOrderRow key={order.id} order={order} onUpdate={updateOrder} />
+              ))
+            )}
+          </div>
+        </>
+      ) : (
+        <section className="admin-products-section">
+          <div className="admin-products-heading">
+            <div>
+              <h2>Catálogo de produtos</h2>
+              <p>Edite preços, especificações, imagens e estoque ou cadastre um novo produto.</p>
+            </div>
+            <button className="secondary-button compact-button" onClick={resetProductForm}>+ NOVO PRODUTO</button>
+          </div>
+
+          <form className="admin-product-form" onSubmit={saveProduct}>
+            <h3>{editingProductId ? "EDITAR PRODUTO" : "ADICIONAR PRODUTO"}</h3>
+            <div className="admin-product-fields">
+              <label>Nome do produto<input required value={productForm.name} onChange={(event) => setProductForm({ ...productForm, name: event.target.value })} placeholder="Ex.: PC Start" /></label>
+              <label>Categoria<input required value={productForm.category} onChange={(event) => setProductForm({ ...productForm, category: event.target.value })} placeholder="Ex.: PC DE ENTRADA" /></label>
+              <label>Preço (R$)<input required type="text" inputMode="decimal" value={productForm.price} onChange={(event) => setProductForm({ ...productForm, price: event.target.value })} placeholder="799,90" /></label>
+              <label>Processador<input required value={productForm.processor} onChange={(event) => setProductForm({ ...productForm, processor: event.target.value })} placeholder="Ex.: Ryzen 5 5600" /></label>
+              <label>Placa de vídeo<input required value={productForm.gpu} onChange={(event) => setProductForm({ ...productForm, gpu: event.target.value })} placeholder="Ex.: RTX 4060 8GB" /></label>
+              <label>Memória RAM<input required value={productForm.ram} onChange={(event) => setProductForm({ ...productForm, ram: event.target.value })} placeholder="Ex.: 16GB DDR4" /></label>
+              <label>Armazenamento<input required value={productForm.storage} onChange={(event) => setProductForm({ ...productForm, storage: event.target.value })} placeholder="Ex.: SSD NVMe 512GB" /></label>
+              <label>Imagem (caminho ou URL)<input required value={productForm.image} onChange={(event) => setProductForm({ ...productForm, image: event.target.value })} placeholder="pcs/novo-pc.png ou https://..." /></label>
+              <label className="admin-product-wide">Descrição<textarea required value={productForm.description} onChange={(event) => setProductForm({ ...productForm, description: event.target.value })} rows={3} placeholder="Descreva o produto" /></label>
+            </div>
+            <div className="admin-product-toggles">
+              <label><input type="checkbox" checked={productForm.stock} onChange={(event) => setProductForm({ ...productForm, stock: event.target.checked })} /> Disponível em estoque</label>
+              <label><input type="checkbox" checked={productForm.featured} onChange={(event) => setProductForm({ ...productForm, featured: event.target.checked })} /> Marcar como destaque</label>
+            </div>
+            <div className="admin-product-actions">
+              <button className="submit-order" type="submit" disabled={savingProduct}>{savingProduct ? "SALVANDO..." : editingProductId ? "SALVAR ALTERAÇÕES" : "ADICIONAR À VITRINE"}</button>
+              {editingProductId && <button className="secondary-button compact-button" type="button" onClick={resetProductForm}>CANCELAR EDIÇÃO</button>}
+            </div>
+          </form>
+
+          <div className="admin-product-list">
+            {pcs.map((pc) => (
+              <article className="admin-product-row" key={pc.id}>
+                <img src={pc.image} alt="" />
+                <div className="admin-product-summary">
+                  <strong>{pc.name}</strong>
+                  <span>{money(pc.priceValue)} · {pc.stock ? "Em estoque" : "Sem estoque"}</span>
+                  <small>{pc.processor} · {pc.ram}</small>
+                </div>
+                <div className="admin-product-row-actions">
+                  <button type="button" className="secondary-button compact-button" onClick={() => editProduct(pc)}>EDITAR</button>
+                  <button type="button" className="admin-delete-button" onClick={() => void deleteProduct(pc.id)}>REMOVER</button>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
     </main>
   );
 }

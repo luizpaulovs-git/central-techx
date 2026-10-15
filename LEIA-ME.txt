@@ -1,0 +1,25 @@
+CENTRAL TECHX — GERENCIAMENTO DE PRODUTOS
+
+O QUE FOI ADICIONADO
+- Nova aba “PRODUTOS E PCs” na área de funcionários/administração.
+- Editar nome, categoria, descrição, preço, processador, placa de vídeo, RAM, armazenamento, imagem, estoque e destaque.
+- Cadastrar novos produtos e remover produtos da vitrine.
+- A vitrine pública carrega o catálogo salvo no Supabase.
+- Mantém os quatro PCs locais como fallback se a tabela ainda não estiver configurada.
+- Mantém o botão de montagem personalizada abrindo o WhatsApp presente na versão-base deste pacote.
+
+ANTES DE SUBSTITUIR ARQUIVOS
+1. Faça uma cópia de segurança do src/App.tsx e src/App.css atuais.
+2. No Supabase do projeto correto, abra SQL Editor e execute supabase/products.sql.
+3. Copie src/App.tsx e src/App.css deste pacote para a pasta src do projeto.
+4. No terminal da pasta do projeto, execute: npm run build
+5. Abra o site, entre pela área de funcionários com a conta cujo profiles.role é 'admin' e teste a aba “PRODUTOS E PCs”.
+
+IMAGENS
+O campo imagem aceita URL https://... ou caminho de um arquivo que já exista no projeto, por exemplo pcs/novo-pc.png. Este pacote não inclui upload de arquivos de imagem; para usar um arquivo local, coloque-o na pasta pública de imagens do site e informe o caminho.
+
+SEGURANÇA
+A tabela permite leitura pública do catálogo. Inserir, editar e remover exigem usuário autenticado cujo registro em public.profiles tenha role='admin'. Nunca coloque a chave service_role no frontend.
+
+LIMITAÇÃO DE VALIDAÇÃO
+Este pacote foi montado sobre os arquivos App.tsx/App.css enviados anteriormente. Não foi possível executar npm run build do projeto completo porque package.json, src/lib/supabase.ts e o restante do projeto não estavam disponíveis aqui. A criação/edição real depende de executar o SQL no mesmo projeto Supabase usado pelo site.
