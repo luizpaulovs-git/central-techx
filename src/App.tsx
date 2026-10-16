@@ -167,6 +167,34 @@ function App() {
   const [adminLoading, setAdminLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [adminError, setAdminError] = useState("");
+  const [authReady, setAuthReady] = useState(false);
+  const [customerAuthenticated, setCustomerAuthenticated] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    async function readAuthSession() {
+      const { data } = await supabase.auth.getSession();
+      if (!active) return;
+      const user = data.session?.user;
+      setCustomerAuthenticated(Boolean(user && user.email && !user.is_anonymous));
+      setAuthReady(true);
+    }
+
+    void readAuthSession();
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
+      if (!active) return;
+      const user = session?.user;
+      setCustomerAuthenticated(Boolean(user && user.email && !user.is_anonymous));
+      setAuthReady(true);
+    });
+
+    return () => {
+      active = false;
+      listener.subscription.unsubscribe();
+    };
+  }, []);
 
   async function loadProducts() {
     // A vitrine continua mostrando os quatro PCs locais caso a tabela ainda não exista.
@@ -213,15 +241,11 @@ function App() {
 
   async function ensureCustomerSession() {
     const { data } = await supabase.auth.getSession();
-    if (data.session) return data.session;
-
-    const { data: anonymousData, error } = await supabase.auth.signInAnonymously();
-    if (error) {
-      console.error("Erro ao criar sessão anônima:", error);
-      setMessage("Não foi possível iniciar sua sessão. Verifique a configuração do Supabase.");
-      return null;
-    }
-    return anonymousData.session;
+    const user = data.session?.user;
+    if (user && user.email && !user.is_anonymous) return data.session;
+    setMessage("Entre na sua conta para acessar seus pedidos.");
+    setPage("account");
+    return null;
   }
 
   async function loadOrders() {
@@ -312,6 +336,29 @@ function App() {
     setOrderPC(pc);
   }
 
+  // Clientes precisam estar autenticados para acessar qualquer área da loja.
+  // A área de funcionários continua acessível pelo link específico de login.
+  if (!authReady) {
+    return (
+      <div className="site">
+        <main className="account-page">
+          <p className="account-muted">Verificando sua sessão...</p>
+        </main>
+      </div>
+    );
+  }
+
+  if (!customerAuthenticated && page !== "admin") {
+    return (
+      <div className="site">
+        <AccountPage
+          onAuthenticated={() => setPage("home")}
+          onEmployeeLogin={() => setPage("admin")}
+        />
+      </div>
+    );
+  }
+
   if (page === "account") {
     return (
       <div className="site">
@@ -322,7 +369,10 @@ function App() {
           onAccount={() => setPage("account")}
           onSection={scrollToSection}
         />
-        <AccountPage onAuthenticated={() => setPage("orders")} />
+        <AccountPage
+          onAuthenticated={() => setPage("home")}
+          onEmployeeLogin={() => setPage("admin")}
+        />
       </div>
     );
   }
@@ -351,7 +401,7 @@ function App() {
             await supabase.auth.signOut();
             setAdminUser(false);
             setOrders([]);
-            setPage("home");
+            setPage("account");
           }}
           error={adminError}
           setError={setAdminError}
@@ -553,20 +603,10 @@ function App() {
               <button onClick={() => setPage("account")}>Minha conta</button>
             </div>
 
-            <div className="footer-column footer-employee-column">
-              <strong>ACESSO</strong>
-              <button type="button" className="employee-access" onClick={() => setPage("admin")}>
-                <span>É funcionário?</span>
-                Acessar área de funcionários
-              </button>
-            </div>
           </div>
 
           <div className="footer-bottom">
             <p>© 2026 Central TechX. Todos os direitos reservados.</p>
-            <button type="button" className="employee-access employee-access-bottom" onClick={() => setPage("admin")}>
-              É funcionário? <span>Acessar área de funcionários</span>
-            </button>
           </div>
         </footer>
       </main>
@@ -589,7 +629,13 @@ function App() {
 
 type AccountMode = "login" | "signup" | "recover" | "reset";
 
-function AccountPage({ onAuthenticated }: { onAuthenticated: () => void }) {
+function AccountPage({
+  onAuthenticated,
+  onEmployeeLogin,
+}: {
+  onAuthenticated: () => void;
+  onEmployeeLogin: () => void;
+}) {
   const [mode, setMode] = useState<AccountMode>(() =>
     typeof window !== "undefined" && window.location.hash.includes("type=recovery")
       ? "reset"
@@ -818,6 +864,17 @@ function AccountPage({ onAuthenticated }: { onAuthenticated: () => void }) {
           </>
         )}
       </section>
+      {(!currentEmail || isAnonymous) && (
+        <footer
+          className="account-access-footer"
+          style={{ marginTop: "24px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}
+        >
+          <span>É funcionário da Central TechX?</span>
+          <button type="button" className="employee-access" onClick={onEmployeeLogin}>
+            Acessar área de funcionários
+          </button>
+        </footer>
+      )}
     </main>
   );
 }
@@ -903,21 +960,16 @@ function OrderModal({
     setSaving(true);
     setError("");
 
-    let { data: sessionData } = await supabase.auth.getSession();
+    const { data: sessionData } = await supabase.auth.getSession();
+    const sessionUser = sessionData.session?.user;
 
-    if (!sessionData.session) {
-      const { data: anonymousData, error: authError } = await supabase.auth.signInAnonymously();
-
-      if (authError) {
-        setError("Não foi possível iniciar o pedido. Verifique a configuração do Supabase.");
-        setSaving(false);
-        return;
-      }
-
-      sessionData = { session: anonymousData.session };
+    if (!sessionUser || !sessionUser.email || sessionUser.is_anonymous) {
+      setError("Entre na sua conta antes de confirmar o pedido.");
+      setSaving(false);
+      return;
     }
 
-    const userId = sessionData.session?.user.id;
+    const userId = sessionUser.id;
 
     if (!userId) {
       setError("Sessão do cliente não encontrada.");
